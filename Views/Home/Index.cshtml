@@ -1,0 +1,202 @@
+﻿@using Newtonsoft.Json
+@using System.Web
+@{
+    ViewData["Title"] = "Home Page";
+}
+
+@model List<Address>
+
+ <div id="map"></div>
+ <div id="menu">
+     <label for="description" id="description_label">Description</label>
+     <input type="text" id="description" />
+     <input type="checkbox" id="isPrivate" />
+     <label for="isPrivate" id="isPrivate_label">Private</label>
+     <select id="types">
+         <option value="Home">Home</option>
+         <option value="Work">Work</option>
+         <option value="Entertainment">Entertainment</option>
+     </select>
+     <button id="add" onclick="AddMarker()">Add</button>
+     <button id="delete" onclick="DeleteMarker()">Delete</button>
+</div>
+<div id="addresses_list" class="list-group">
+    <div class="list-group-item">
+        <div id="Home" class="list-group">
+            Home
+            @foreach(var item in Model.Where(x => x.Type=="Home"))
+            {
+                <div id="@item.Id" class="list-group-item" onclick="ChangeCurrAddress(this.id)">@item.Description</div>
+            }
+        </div>
+    </div>
+    <div class="list-group-item">
+        <div id="Work" class="list-group">
+            Work
+            @foreach(var item in Model.Where(x => x.Type=="Work"))
+            {
+                <div id="@item.Id" class="list-group-item" onclick="ChangeCurrAddress(this.id)">@item.Description</div>
+            }
+        </div>
+    </div>
+    <div class="list-group-item">
+        <div id="Entertainment" class="list-group">
+            Entertainment
+            @foreach(var item in Model.Where(x => x.Type=="Entertainment"))
+            {
+                <div id="@item.Id" class="list-group-item" onclick="ChangeCurrAddress(this.id)">@item.Description</div>
+            }
+        </div>
+    </div>
+</div>
+
+<script async defer
+src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBfYXxwRVxAbu83jj1dbK9Q-5YiiHKMHcs&callback=initMap"
+></script>
+
+<script>
+    let Addresses = {
+    @foreach(var item in Model)
+    {
+        @Html.Raw("\"" + item.Id + "\": " + JsonConvert.SerializeObject(item) + (item != Model.Last() ? "," : ""));
+    }
+    };
+    let currAddress = {};
+    let currCoord = { lat: 50.450311, lng: 30.524505 };
+    let marker = null;
+    let map = { };
+
+    function SetAddress(id) {
+        if(id in Addresses) {
+            currAddress = Addresses[id];
+            currCoord = { lat: currAddress.Latitude, lng: currAddress.Longitude };
+            if(marker != null) {
+                marker.setPosition(currCoord);
+                map.setCenter(marker.getPosition());
+            }
+        }
+    }
+    SetAddress(Object.keys(Addresses)[0]);
+
+    function initMap() {
+        $("#addresses_list #" + currAddress.Id).addClass('active');
+
+        map = new google.maps.Map(document.getElementById("map"), {
+            zoom: 4,
+            center: currCoord,
+        });
+        marker = new google.maps.Marker({
+            position: currCoord,
+            map: map,
+        });
+
+        map.addListener("click", (mapsClickEvent) => {
+            currCoord = mapsClickEvent.latLng.toJSON();
+            marker.setPosition(currCoord);
+      });
+    }
+    window.initMap = initMap;
+
+    function AddMarker() {
+        var info = { };
+        info.Description = $('#description').val();
+        if(info.Description.length == 0) {
+            alert("Enter Description!");
+            return;
+        }
+        info.Latitude = currCoord.lat;
+        info.Longitude = currCoord.lng;
+        info.Type = $("#types").find(":selected").val();
+        info.IsPublic = $("#isPrivate:checked").length == 0;
+
+        $.ajax({
+            type: 'POST',
+            contentType: "application/json; charset=utf-8;",
+            url: 'Home/InsertAddress', 
+            data: JSON.stringify(info), 
+            dataType: 'json',
+            async: true,
+            success: function (newId) {
+                info.Id = newId;
+                Addresses[info.Id] = info;
+                AddListItem(info);
+                ChangeCurrAddress(newId);
+            },
+            error: function () {
+
+            }
+        });
+    }
+
+    function DeleteMarker() {
+        $.ajax({
+            type: 'POST',
+            contentType: "application/json; charset=utf-8;",
+            url: 'Home/DeleteAddress', 
+            data: JSON.stringify(currAddress.Id), 
+            dataType: 'json',
+            async: true,
+            success: function (response) {
+                DeleteListItem();
+            },
+            error: function () {
+
+            }
+        });
+    }
+
+    function AddListItem(info) {
+        $('#addresses_list #' + info.Type).append("<div class='list-group-item' id='" + info.Id + "' onclick=\"ChangeCurrAddress(this.id)\">" + info.Description + "</div>");
+    }
+
+    function DeleteListItem() {
+        $(FindAddressPos(currAddress)).remove();
+        delete Addresses[currAddress.Id];
+        if(Object.keys(Addresses).length > 0) ChangeCurrAddress(Object.keys(Addresses)[0]);
+    }
+
+    function ChangeCurrAddress(id) {
+        $(FindAddressPos(currAddress)).removeClass('active');
+        SetAddress(id);
+        $(FindAddressPos(currAddress)).addClass('active');
+    }
+
+    function FindAddressPos(address) {
+        return "#addresses_list #" + address.Type + " #" + address.Id;
+    }
+</script>
+
+<style>
+    #map {
+        height: 80vh;
+        width: 100%;
+    }
+    button {
+        color: white;
+    }
+    #menu {
+        display: flex;
+        justify-content: center;
+    }
+    #description, #types, #add, #isPrivate_label, #description_label {
+        margin: 0 10px 0 0;
+    }
+    #add {
+        background: green;
+    }
+    #delete {
+        background: red;
+    }
+    #menu, #addresses_list {
+        margin: 10px 0 0 0;
+    }
+    #Home {
+        background: salmon;
+    }
+    #Work {
+        background: lightblue;
+    }
+    #Entertainment {
+        background: lightgreen;
+    }
+</style>

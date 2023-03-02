@@ -1,0 +1,97 @@
+﻿@{
+    ViewData["Title"] = "Shared Addreses";
+}
+
+@using Newtonsoft.Json
+
+@model List<Address>
+
+<h1>Recent added addresses</h1>
+
+<div id="addresses_list" class="list-group">
+    @foreach(var item in Model)
+    {
+        <div id=@item.Id class="list-group-item @item.Type" onclick="ChangeCurrAddress(this.id)">
+            <div class="Name">@item.Description</div>
+            <div class="Info">@item.Type &nbsp;&nbsp; @item.CreationDate</div>
+        </div>
+    }
+</div>
+<div id="map"></div>
+
+<script async defer
+src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBfYXxwRVxAbu83jj1dbK9Q-5YiiHKMHcs&callback=initMap"
+></script>
+
+<script>
+    let Addresses = {
+    @foreach(var item in Model)
+    {
+        @Html.Raw("\"" + item.Id + "\": " + JsonConvert.SerializeObject(item) + (item != Model.Last() ? "," : ""));
+    }
+    };
+    function ChangeCurrAddress(id) {
+        $("#" + currAddress.Id).removeClass('active');
+        SetAddress(id);
+        $("#" + currAddress.Id).addClass('active');
+    }
+
+    let currAddress = { };
+    let currCoord = { };
+    let marker = null;
+    let map = { };
+
+    function SetAddress(id) {
+        if(id in Addresses) {
+            currAddress = Addresses[id];
+            currCoord = { lat: currAddress.Latitude, lng: currAddress.Longitude };
+            if(marker != null) {
+                marker.setPosition(currCoord);
+                map.setCenter(marker.getPosition());
+            }
+        }
+    }
+    SetAddress(Object.keys(Addresses)[0]);
+
+    function initMap() {
+        map = new google.maps.Map(document.getElementById("map"), {
+            zoom: 4,
+            center: currCoord,
+        });
+        marker = new google.maps.Marker({
+            position: currCoord,
+            map: map,
+        });
+    }
+    window.initMap = initMap;
+</script>
+
+
+<style>
+    #addresses_list {
+        width: 50%;
+        float: left;
+        margin 0 10px 0 0;
+    }
+    #map {
+        height: 50vh;
+        width: 50%;
+        float: right;
+    }
+    .list-group-item {
+        display: flex;
+    }
+    .Info {
+        margin-left: auto;
+        margin-right: 0;
+    }
+    .Home {
+        background: salmon;
+    }
+    .Work {
+        background: lightblue;
+    }
+    .Entertainment {
+        background: lightgreen;
+    }
+</style>
